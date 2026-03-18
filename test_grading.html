@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grading System Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #2c2416; }
+        .test-case {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-case h3 {
+            margin-top: 0;
+            color: #0f4c75;
+        }
+        .input-row {
+            display: flex;
+            gap: 20px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        .input-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        .input-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .result.correct {
+            background: #d4edda;
+            color: #155724;
+        }
+        .result.partial {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .result.incorrect {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .summary {
+            background: #2c2416;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .summary h2 { margin-top: 0; }
+        button {
+            background: #c45d3e;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 20px 0;
+        }
+        button:hover {
+            background: #a94d32;
+        }
+        .student-section {
+            border: 2px solid #3282b8;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        .student-section h2 {
+            color: #3282b8;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>📝 评分系统测试</h1>
+    <p>测试不同格式和完整度的答案评分情况</p>
+
+    <div id="testResults"></div>
+
+    <script>
+        // 从 quiz.html 复制评分逻辑
+        function normalize(str) {
+            return str
+                .toLowerCase()
+                .replace(/\s+/g, '')
+                .replace(/['"]/g, '"')
+                .replace(/\.0+(?=,|$|\))/g, '')
+                .replace(/,+/g, ',')
+                .replace(/\)$/g, '')
+                .trim();
+        }
+
+        function parseNumericVector(input) {
+            let cleaned = input
+                .replace(/[()[\]'"]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            let numbers = cleaned.split(/[,;\s]+/)
+                .map(s => parseFloat(s.trim()))
+                .filter(n => !isNaN(n));
+            return numbers;
+        }
+
+        function checkRCode(userCode, expectedFunc, expectedArg) {
+            const normalized = normalize(userCode);
+            const variations = [
+                `${expectedFunc}(${expectedArg})`,
+                `${expectedFunc}(${expectedArg}`,
+            ];
+            const hasFunc = normalized.includes(expectedFunc);
+            const hasArg = normalized.includes(expectedArg.toLowerCase());
+            return variations.some(v => normalize(v) === normalized) || (hasFunc && hasArg);
+        }
+
+        function checkConditionCode(userCode, expectedFunc, expectedVar, expectedOp, expectedVal) {
+            const normalized = normalize(userCode);
+            const hasFunc = normalized.includes(expectedFunc);
+            const hasVar = normalized.includes(expectedVar);
+            const hasOp = normalized.includes(expectedOp);
+            const hasVal = normalized.includes(String(expectedVal));
+            return hasFunc && hasVar && hasOp && hasVal;
+        }
+
+        const answers = {
+            q1a: { points: 6, type: 'numeric_vector', expected: [3, 4, 2, 3, 4, 2], tolerance: 0.001 },
+            q1b: { points: 6, type: 'numeric_vector', expected: [2.5, 4, 1.5, 3, 5, 2], tolerance: 0.01 },
+            q1c: { points: 8, type: 'numeric_vector', expected: [85, 102, 78, 91, 110, 82], tolerance: 0.001 },
+            q2a_code: { points: 3, type: 'r_function', func: 'mean', arg: 'toefl' },
+            q2a_ans: { points: 3, type: 'numeric', expected: 91.33333, tolerance: 0.5 },
+            q2b_code: { points: 3, type: 'r_function', func: 'sd', arg: 'study' },
+            q2b_ans: { points: 3, type: 'numeric', expected: 1.264911, tolerance: 0.1 },
+            q2c_code: { points: 3, type: 'r_function', func: 'min', arg: 'toefl' },
+            q2c_ans: { points: 3, type: 'numeric', expected: 78, tolerance: 0.001 },
+            q2d_code: { points: 3, type: 'r_condition', func: 'sum', var: 'study', op: '>', val: 2.5 },
+            q2d_ans: { points: 3, type: 'numeric', expected: 3, tolerance: 0.001 },
+            q2e: { points: 6, type: 'text_concept', concepts: [
+                ['divide', 'divides', 'divided', 'division', 'split', '除', '÷', '/10', '/ 10'],
+                ['each', 'every', 'all', 'element', 'number', 'score', '每', '各', '所有', '個', '个', 'individual'],
+                ['vector', '向量', 'result', 'results', '結果', '结果', 'output', 'return', 'new', 'scaled', 'smaller']
+            ], minConcepts: 2 },
+            q3a: { points: 12, type: 'dataframe_code', requiredElements: ['data.frame', 'id', 'year', 'major', 'study', 'toefl'], minRequired: 4 },
+            q3b_obs: { points: 2, type: 'numeric', expected: 6, tolerance: 0 },
+            q3b_var: { points: 2, type: 'numeric', expected: 5, tolerance: 0 },
+            q3c: { points: 4, type: 'numeric', expected: 88, tolerance: 0.5 },
+            q4a: { points: 10, type: 'text_concept', concepts: [
+                ['one', 'single', '1d', '1-d', 'one-dimension', 'one dimension', 'linear', '一維', '一维', '單一', '单一', 'same type', 'homogeneous', '同類', '同类', 'dimention', 'dimensional'],
+                ['two', 'multi', '2d', '2-d', 'two-dimension', 'two dimension', 'table', 'spreadsheet', 'matrix', '二維', '二维', '表', '表格', 'different type', 'heterogeneous', 'dimention', 'dimensional'],
+                ['column', 'columns', 'row', 'rows', 'variable', 'variables', 'field', 'fields', '行', '列', '欄', '栏', '變數', '变量', 'coloumn', 'roes']
+            ], minConcepts: 2 },
+            q4b: { points: 10, type: 'text_concept', concepts: [
+                ['assign', 'assigns', 'assignment', 'asign', 'asignment', 'store', 'stores', 'storing', 'save', 'saves', 'put', 'puts', 'set', 'sets', 'define', 'defines', 'create', 'creates', '賦值', '赋值', '指派', '儲存', '存储', '給', '给', 'operater'],
+                ['value', 'values', 'variable', 'variables', 'name', 'object', 'data', '值', '變數', '变量', '物件', '对象', 'varable'],
+                ['gets', 'get', 'receive', 'receives', 'arrow', 'left arrow', 'point', 'points', '得到', '接收', '箭頭', '箭头']
+            ], minConcepts: 1 },
+            q4c: { points: 10, type: 'text_concept', concepts: [
+                ['average', 'averages', 'mean', 'sum', 'total', 'add', 'adding', 'arithmetic', '平均', '加總', '加总', '總和', '总和', 'avarage'],
+                ['middle', 'center', 'central', 'median', 'midpoint', 'half', '50%', '中間', '中间', '中位', '中數', '中数'],
+                ['outlier', 'outliers', 'extreme', 'extremes', 'skew', 'skewed', 'different', 'sensitive', 'affected', 'influenced', 'robust', '極端', '极端', '異常', '异常', '偏', 'extream', 'afected']
+            ], minConcepts: 2 }
+        };
+
+        function checkAnswer(questionId, userAnswer) {
+            const answer = answers[questionId];
+            if (!answer) return { correct: false, points: 0 };
+            if (!userAnswer || userAnswer.trim() === '') return { correct: false, points: 0 };
+
+            const trimmedAnswer = userAnswer.trim();
+
+            switch (answer.type) {
+                case 'numeric_vector': {
+                    const userVec = parseNumericVector(trimmedAnswer);
+                    const expected = answer.expected;
+                    if (userVec.length !== expected.length) {
+                        let correctCount = 0;
+                        for (let i = 0; i < Math.min(userVec.length, expected.length); i++) {
+                            if (Math.abs(userVec[i] - expected[i]) <= answer.tolerance) {
+                                correctCount++;
+                            }
+                        }
+                        const partial = (correctCount / expected.length) * answer.points;
+                        return { correct: false, points: Math.round(partial * 10) / 10 };
+                    }
+                    const allCorrect = expected.every((val, idx) =>
+                        Math.abs(val - userVec[idx]) <= answer.tolerance
+                    );
+                    if (allCorrect) {
+                        return { correct: true, points: answer.points };
+                    }
+                    let correctCount = 0;
+                    expected.forEach((val, idx) => {
+                        if (Math.abs(val - userVec[idx]) <= answer.tolerance) {
+                            correctCount++;
+                        }
+                    });
+                    const partial = (correctCount / expected.length) * answer.points;
+                    return { correct: false, points: Math.round(partial * 10) / 10 };
+                }
+
+                case 'numeric': {
+                    const numMatch = trimmedAnswer.match(/-?\d+\.?\d*/);
+                    if (!numMatch) return { correct: false, points: 0 };
+                    const userNum = parseFloat(numMatch[0]);
+                    const isCorrect = Math.abs(userNum - answer.expected) <= answer.tolerance;
+                    return { correct: isCorrect, points: isCorrect ? answer.points : 0 };
+                }
+
+                case 'r_function': {
+                    const isCorrect = checkRCode(trimmedAnswer, answer.func, answer.arg);
+                    return { correct: isCorrect, points: isCorrect ? answer.points : 0 };
+                }
+
+                case 'r_condition': {
+                    const isCorrect = checkConditionCode(trimmedAnswer, answer.func, answer.var, answer.op, answer.val);
+                    return { correct: isCorrect, points: isCorrect ? answer.points : 0 };
+                }
+
+                case 'text_concept': {
+                    const lowerAnswer = trimmedAnswer.toLowerCase();
+                    let matchedConcepts = 0;
+                    answer.concepts.forEach(conceptGroup => {
+                        const hasMatch = conceptGroup.some(keyword =>
+                            lowerAnswer.includes(keyword.toLowerCase())
+                        );
+                        if (hasMatch) matchedConcepts++;
+                    });
+                    const isCorrect = matchedConcepts >= answer.minConcepts;
+                    const ratio = matchedConcepts / answer.concepts.length;
+                    const earnedPoints = Math.round(ratio * answer.points * 10) / 10;
+                    return {
+                        correct: isCorrect,
+                        points: Math.max(isCorrect ? answer.points : earnedPoints, 0)
+                    };
+                }
+
+                case 'dataframe_code': {
+                    const lowerAnswer = trimmedAnswer.toLowerCase();
+                    let matchCount = 0;
+                    answer.requiredElements.forEach(element => {
+                        if (lowerAnswer.includes(element.toLowerCase())) {
+                            matchCount++;
+                        }
+                    });
+                    const isCorrect = matchCount >= answer.minRequired;
+                    const ratio = matchCount / answer.requiredElements.length;
+                    const earnedPoints = Math.round(ratio * answer.points * 10) / 10;
+                    return {
+                        correct: isCorrect,
+                        points: isCorrect ? answer.points : earnedPoints
+                    };
+                }
+
+                default:
+                    return { correct: false, points: 0 };
+            }
+        }
+
+        // 测试用例
+        // 更新后的评分函数
+        function checkRCode(userCode, expectedFunc, expectedArg) {
+            const normalized = normalize(userCode);
+            const userLower = userCode.toLowerCase().trim();
+
+            const hasFunc = normalized.includes(expectedFunc);
+            const hasArg = normalized.includes(expectedArg.toLowerCase());
+
+            // Pipe 写法检查
+            const pipePattern = new RegExp(`${expectedArg}\\s*(%>%|\\|>)\\s*${expectedFunc}`, 'i');
+            const hasPipe = pipePattern.test(userCode);
+
+            // 命名参数检查
+            const namedArgPattern = new RegExp(`${expectedFunc}\\s*\\([^)]*=\\s*${expectedArg}`, 'i');
+            const hasNamedArg = namedArgPattern.test(userCode);
+
+            return (hasFunc && hasArg) || hasPipe || hasNamedArg;
+        }
+
+        function checkConditionCode(userCode, expectedFunc, expectedVar, expectedOp, expectedVal) {
+            const normalized = normalize(userCode);
+            const userLower = userCode.toLowerCase();
+
+            const hasFunc = normalized.includes(expectedFunc);
+            const hasVar = normalized.includes(expectedVar);
+            const hasOp = normalized.includes('>') || normalized.includes('>=');
+            const valPattern = new RegExp(String(expectedVal).replace('.', '\\.?'));
+            const hasVal = valPattern.test(normalized);
+
+            const altPattern = /length\s*\(\s*study\s*\[\s*study\s*>\s*2\.?5/i;
+            const hasAltSyntax = altPattern.test(userCode);
+
+            return (hasFunc && hasVar && hasOp && hasVal) || hasAltSyntax;
+        }
+
+        const testStudents = [
+            {
+                name: "学生 A - 完美答案",
+                answers: {
+                    q1a: "3, 4, 2, 3, 4, 2)",
+                    q1b: "2.5, 4.0, 1.5, 3.0, 5.0, 2.0)",
+                    q1c: "85, 102, 78, 91, 110, 82)",
+                    q2a_code: "mean(toefl)",
+                    q2a_ans: "91.33",
+                    q2b_code: "sd(study)",
+                    q2b_ans: "1.26",
+                    q2c_code: "min(toefl)",
+                    q2c_ans: "78",
+                    q2d_code: "sum(study > 2.5)",
+                    q2d_ans: "3",
+                    q2e: "It divides each element of the vector by 10",
+                    q3a: "id <- c(...)\nmajor <- c(...)\nstudents <- data.frame(id, year, major, study, toefl)",
+                    q3b_obs: "6",
+                    q3b_var: "5",
+                    q3c: "88",
+                    q4a: "A vector is one-dimensional with same type. A data frame is two-dimensional with multiple columns.",
+                    q4b: "The <- operator assigns value to variable. x <- 5 is read as x gets 5.",
+                    q4c: "mean() calculates the average, median() finds the middle value. They differ with outliers."
+                }
+            },
+            {
+                name: "学生 B - 格式略有不同",
+                answers: {
+                    q1a: "3,4,2,3,4,2",  // 没有空格，没有括号
+                    q1b: "2.5 4 1.5 3 5 2",  // 用空格分隔，省略 .0
+                    q1c: "85,102,78,91,110,82)",
+                    q2a_code: "mean( toefl )",  // 多余空格
+                    q2a_ans: "91.3",  // 少一位小数
+                    q2b_code: "sd(study)",
+                    q2b_ans: "1.3",  // 四舍五入
+                    q2c_code: "min( toefl)",
+                    q2c_ans: "78",
+                    q2d_code: "sum(study>2.5)",  // 无空格
+                    q2d_ans: "3",
+                    q2e: "divides every element by 10 and returns result",
+                    q3a: "data.frame(id=id, year=year, major=major, study=study, toefl=toefl)",
+                    q3b_obs: "6",
+                    q3b_var: "5",
+                    q3c: "88.0",
+                    q4a: "vector is 1D, data frame is 2D table with rows and columns",
+                    q4b: "assignment operator, stores value in variable",
+                    q4c: "mean is average sum divided by count, median is middle number, outliers affect mean more"
+                }
+            },
+            {
+                name: "学生 C - 部分正确",
+                answers: {
+                    q1a: "3, 4, 2, 3, 4",  // 少一个数字
+                    q1b: "2.5, 4, 1.5, 3, 5, 2)",
+                    q1c: "85, 102, 78, 91, 110, 82)",
+                    q2a_code: "average(toefl)",  // 函数名错误
+                    q2a_ans: "91",  // 没有小数
+                    q2b_code: "sd(study)",
+                    q2b_ans: "1.26",
+                    q2c_code: "min(toefl)",
+                    q2c_ans: "78",
+                    q2d_code: "count(study > 2.5)",  // 函数名错误
+                    q2d_ans: "3",
+                    q2e: "it gives smaller numbers",  // 不完整
+                    q3a: "data.frame(year, study, toefl)",  // 缺少 id 和 major
+                    q3b_obs: "6",
+                    q3b_var: "5",
+                    q3c: "88",
+                    q4a: "vector stores data, data frame is like a table",  // 部分正确
+                    q4b: "it assigns a value",
+                    q4c: "mean is the average"  // 不完整
+                }
+            },
+            {
+                name: "学生 D - 中文回答",
+                answers: {
+                    q1a: "3, 4, 2, 3, 4, 2)",
+                    q1b: "2.5, 4.0, 1.5, 3.0, 5.0, 2.0)",
+                    q1c: "85, 102, 78, 91, 110, 82)",
+                    q2a_code: "mean(toefl)",
+                    q2a_ans: "91.33",
+                    q2b_code: "sd(study)",
+                    q2b_ans: "1.26",
+                    q2c_code: "min(toefl)",
+                    q2c_ans: "78",
+                    q2d_code: "sum(study > 2.5)",
+                    q2d_ans: "3",
+                    q2e: "將向量中每個元素除以10",
+                    q3a: "students <- data.frame(id, year, major, study, toefl)",
+                    q3b_obs: "6",
+                    q3b_var: "5",
+                    q3c: "88",
+                    q4a: "向量是一維的，只能存一種類型。數據框是二維表格，可以有多個欄位。",
+                    q4b: "<- 是賦值運算子，將右邊的值儲存到左邊的變數。x <- 5 讀作 x 得到 5。",
+                    q4c: "mean() 計算平均值，median() 找中位數。當有極端值時，結果會差很多。"
+                }
+            },
+            {
+                name: "学生 E - 很多空白/未作答",
+                answers: {
+                    q1a: "",
+                    q1b: "2.5, 4.0, 1.5, 3.0, 5.0, 2.0)",
+                    q1c: "",
+                    q2a_code: "",
+                    q2a_ans: "",
+                    q2b_code: "sd(study)",
+                    q2b_ans: "1.26",
+                    q2c_code: "",
+                    q2c_ans: "",
+                    q2d_code: "",
+                    q2d_ans: "",
+                    q2e: "",
+                    q3a: "",
+                    q3b_obs: "6",
+                    q3b_var: "",
+                    q3c: "",
+                    q4a: "",
+                    q4b: "",
+                    q4c: ""
+                }
+            },
+            {
+                name: "学生 F - 错误但接近",
+                answers: {
+                    q1a: "3, 4, 2, 3, 4, 3)",  // 最后一个错
+                    q1b: "2.5, 4.0, 1.5, 3.0, 5.0, 2.5)",  // 最后一个错
+                    q1c: "85, 102, 79, 91, 110, 82)",  // 一个错
+                    q2a_code: "mean(toefl)",
+                    q2a_ans: "92",  // 略有误差
+                    q2b_code: "sd(study)",
+                    q2b_ans: "1.5",  // 误差较大
+                    q2c_code: "min(toefl)",
+                    q2c_ans: "79",  // 错误
+                    q2d_code: "sum(study > 2.5)",
+                    q2d_ans: "4",  // 错误
+                    q2e: "divides by ten",  // 太简短
+                    q3a: "data.frame(id, year, major, study, toefl)",
+                    q3b_obs: "5",  // 错误
+                    q3b_var: "6",  // 颠倒了
+                    q3c: "85",  // 错误
+                    q4a: "they are different data structures",  // 太模糊
+                    q4b: "arrow operator",  // 不完整
+                    q4c: "they calculate differently"  // 太模糊
+                }
+            },
+            {
+                name: "学生 G - 进阶语法",
+                answers: {
+                    q1a: "c(3, 4, 2, 3, 4, 2)",  // 完整 c() 写法
+                    q1b: "c(2.5, 4, 1.5, 3, 5, 2)",
+                    q1c: "c(85, 102, 78, 91, 110, 82)",
+                    q2a_code: "toefl %>% mean()",  // pipe 写法
+                    q2a_ans: "91.33333",
+                    q2b_code: "study |> sd()",  // R 4.0 原生 pipe
+                    q2b_ans: "1.264911",
+                    q2c_code: "min(x = toefl)",  // 命名参数
+                    q2c_ans: "78",
+                    q2d_code: "length(study[study > 2.5])",  // 另一种写法
+                    q2d_ans: "3",
+                    q2e: "Each score is scaled down by dividing by 10",
+                    q3a: "students <- data.frame(id=id, year=year, major=major, study=study, toefl=toefl)",
+                    q3b_obs: "6",
+                    q3b_var: "5",
+                    q3c: "88",
+                    q4a: "A vector is a one-dimensional homogeneous data structure while a data frame is two-dimensional and can hold different types in each column",
+                    q4b: "The assignment operator stores the right-hand value into the left-hand variable. Read as 'x gets 5'",
+                    q4c: "Mean is sensitive to extreme values while median is robust. With outliers, they differ significantly."
+                }
+            },
+            {
+                name: "学生 H - 拼写错误但概念正确",
+                answers: {
+                    q1a: "3, 4, 2, 3, 4, 2",
+                    q1b: "2.5, 4.0, 1.5, 3.0, 5.0, 2.0",
+                    q1c: "85, 102, 78, 91, 110, 82",
+                    q2a_code: "mean(toefl)",
+                    q2a_ans: "91.33",
+                    q2b_code: "sd(study)",
+                    q2b_ans: "1.26",
+                    q2c_code: "min(toefl)",
+                    q2c_ans: "78",
+                    q2d_code: "sum(study > 2.5)",
+                    q2d_ans: "3",
+                    q2e: "it devides each elemant by 10 and returns new numbers",  // 拼写错误
+                    q3a: "data.frame(id, year, major, study, toefl)",
+                    q3b_obs: "6",
+                    q3b_var: "5",
+                    q3c: "88",
+                    q4a: "vecter is 1 dimention, dataframe is 2 dimention with coloumns and roes",  // 多处拼写错误
+                    q4b: "the asignment operater stores a value into a varable",  // 多处拼写错误
+                    q4c: "avarage vs median: mean is afected by extream values"  // 多处拼写错误
+                }
+            },
+            {
+                name: "学生 I - 超简短回答",
+                answers: {
+                    q1a: "3,4,2,3,4,2",
+                    q1b: "2.5,4,1.5,3,5,2",
+                    q1c: "85,102,78,91,110,82",
+                    q2a_code: "mean(toefl)",
+                    q2a_ans: "91",
+                    q2b_code: "sd(study)",
+                    q2b_ans: "1.3",
+                    q2c_code: "min(toefl)",
+                    q2c_ans: "78",
+                    q2d_code: "sum(study>2.5)",
+                    q2d_ans: "3",
+                    q2e: "smaller numbers",  // 太简短
+                    q3a: "data.frame()",  // 太简短
+                    q3b_obs: "6",
+                    q3b_var: "5",
+                    q3c: "88",
+                    q4a: "1D vs 2D",  // 太简短但有概念
+                    q4b: "assign",  // 只有一个词
+                    q4c: "average middle"  // 太简短
+                }
+            }
+        ];
+
+        function runTests() {
+            let html = '';
+
+            testStudents.forEach(student => {
+                let totalScore = 0;
+                let results = [];
+
+                Object.keys(answers).forEach(qId => {
+                    const userAnswer = student.answers[qId] || '';
+                    const result = checkAnswer(qId, userAnswer);
+                    totalScore += result.points;
+                    results.push({
+                        qId,
+                        userAnswer: userAnswer || '(未作答)',
+                        ...result,
+                        maxPoints: answers[qId].points
+                    });
+                });
+
+                totalScore = Math.round(totalScore * 10) / 10;
+
+                html += `
+                <div class="student-section">
+                    <h2>${student.name}</h2>
+                    <div class="summary">
+                        <h2>总分: ${totalScore} / 100</h2>
+                    </div>
+                `;
+
+                results.forEach(r => {
+                    const statusClass = r.correct ? 'correct' : (r.points > 0 ? 'partial' : 'incorrect');
+                    const displayAnswer = r.userAnswer.length > 80 ? r.userAnswer.substring(0, 80) + '...' : r.userAnswer;
+                    html += `
+                    <div class="test-case">
+                        <h3>${r.qId}</h3>
+                        <p><strong>答案:</strong> <code>${displayAnswer}</code></p>
+                        <div class="result ${statusClass}">
+                            ${r.correct ? '✓ 正确' : (r.points > 0 ? '~ 部分正确' : '✗ 错误')}
+                            - 得分: ${r.points} / ${r.maxPoints}
+                        </div>
+                    </div>
+                    `;
+                });
+
+                html += '</div>';
+            });
+
+            document.getElementById('testResults').innerHTML = html;
+        }
+
+        // 自动运行测试
+        runTests();
+    </script>
+</body>
+</html>

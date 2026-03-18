@@ -1,0 +1,2042 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Mining Lab · Week 3 Assessment</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --paper: #f7f3eb;
+            --paper-dark: #ebe5d9;
+            --ink: #2c2416;
+            --ink-light: #5c5142;
+            --accent: #c45d3e;
+            --accent-glow: #e8734f;
+            --highlight: #f4d79e;
+            --success: #4a7c59;
+            --code-bg: #fdfbf7;
+            --shadow: rgba(44, 36, 22, 0.12);
+            --shadow-deep: rgba(44, 36, 22, 0.25);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 16px;
+        }
+
+        body {
+            font-family: 'Source Serif 4', Georgia, serif;
+            background: var(--paper);
+            color: var(--ink);
+            min-height: 100vh;
+            line-height: 1.7;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Paper texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* Decorative grid lines like graph paper */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(var(--ink) 1px, transparent 1px),
+                linear-gradient(90deg, var(--ink) 1px, transparent 1px);
+            background-size: 80px 80px;
+            opacity: 0.018;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 40px 30px 80px;
+            position: relative;
+        }
+
+        /* ============ HEADER ============ */
+        .lab-header {
+            text-align: center;
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        .lab-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--ink);
+            color: var(--paper);
+            padding: 8px 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .lab-badge::before,
+        .lab-badge::after {
+            content: '◆';
+            font-size: 0.5rem;
+        }
+
+        .lab-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 3.2rem;
+            font-weight: 400;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .lab-title::after {
+            content: '';
+            position: absolute;
+            bottom: 5px;
+            left: 0;
+            right: 0;
+            height: 12px;
+            background: var(--highlight);
+            opacity: 0.6;
+            z-index: -1;
+            transform: skewX(-3deg);
+        }
+
+        .lab-subtitle {
+            font-style: italic;
+            color: var(--ink-light);
+            font-size: 1.1rem;
+        }
+
+        .points-display {
+            display: none;
+        }
+
+        .lab-title-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .lab-title-row .points-inline {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.8rem;
+            font-weight: 700;
+            color: var(--accent);
+            opacity: 0.9;
+            white-space: nowrap;
+        }
+
+        .lab-title-row .points-inline span {
+            font-size: 1rem;
+            font-weight: 400;
+            letter-spacing: 0.1em;
+            margin-left: 5px;
+        }
+
+        /* ============ LOGIN SCREEN ============ */
+        .login-screen {
+            min-height: 60vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-illustration {
+            width: 180px;
+            height: 180px;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .login-illustration svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .login-card {
+            background: white;
+            border: 1px solid var(--paper-dark);
+            padding: 50px 60px;
+            box-shadow:
+                0 2px 0 var(--paper-dark),
+                0 4px 0 var(--paper-dark),
+                0 20px 60px var(--shadow);
+            position: relative;
+            max-width: 420px;
+            width: 100%;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            bottom: 15px;
+            border: 1px solid var(--ink);
+            opacity: 0.06;
+            pointer-events: none;
+        }
+
+        .login-card h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem;
+            font-weight: 400;
+            margin-bottom: 8px;
+        }
+
+        .login-card p {
+            color: var(--ink-light);
+            font-size: 0.9rem;
+            margin-bottom: 35px;
+        }
+
+        .input-field {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .input-field label {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--ink-light);
+            margin-bottom: 8px;
+            text-align: left;
+        }
+
+        .input-field input {
+            width: 100%;
+            padding: 16px 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            border: 2px solid var(--paper-dark);
+            background: var(--code-bg);
+            color: var(--ink);
+            transition: all 0.3s ease;
+            text-align: center;
+            letter-spacing: 0.1em;
+        }
+
+        .input-field input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(196, 93, 62, 0.1);
+        }
+
+        .input-field input::placeholder {
+            color: #bbb;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--ink);
+            color: var(--paper);
+            border: none;
+            padding: 16px 40px;
+            font-family: 'Source Serif 4', serif;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(196, 93, 62, 0.3);
+        }
+
+        .btn-primary:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary svg {
+            width: 18px;
+            height: 18px;
+            transition: transform 0.3s ease;
+        }
+
+        .btn-primary:hover svg {
+            transform: translateX(4px);
+        }
+
+        .error-message {
+            color: var(--accent);
+            font-size: 0.85rem;
+            margin-top: 15px;
+            display: none;
+        }
+
+        /* ============ QUIZ SCREEN ============ */
+        .quiz-screen {
+            display: none;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        .scenario-card {
+            background: linear-gradient(135deg, #fdfbf7 0%, #f9f5ed 100%);
+            border: 1px solid var(--paper-dark);
+            padding: 35px 40px;
+            margin-bottom: 45px;
+            position: relative;
+            box-shadow: 0 10px 40px var(--shadow);
+        }
+
+        .scenario-card::before {
+            content: 'SCENARIO';
+            position: absolute;
+            top: -12px;
+            left: 30px;
+            background: var(--accent);
+            color: white;
+            padding: 4px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+        }
+
+        .scenario-card p {
+            font-size: 1rem;
+            margin-bottom: 25px;
+        }
+
+        .data-table-wrapper {
+            overflow-x: auto;
+            margin: 0 -10px;
+            padding: 0 10px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .data-table thead {
+            background: var(--ink);
+            color: var(--paper);
+        }
+
+        .data-table th {
+            padding: 14px 18px;
+            text-align: left;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--paper-dark);
+        }
+
+        .data-table tbody tr {
+            transition: background 0.2s ease;
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(244, 215, 158, 0.3);
+        }
+
+        .data-table tbody tr:nth-child(even) {
+            background: rgba(0,0,0,0.015);
+        }
+
+        .data-table tbody tr:nth-child(even):hover {
+            background: rgba(244, 215, 158, 0.3);
+        }
+
+        /* ============ QUESTION SECTIONS ============ */
+        .question-section {
+            background: white;
+            border: 1px solid var(--paper-dark);
+            margin-bottom: 35px;
+            position: relative;
+            box-shadow:
+                0 1px 0 var(--paper-dark),
+                0 2px 0 var(--paper-dark),
+                0 15px 50px var(--shadow);
+        }
+
+        .question-section::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--accent);
+        }
+
+        .section-header {
+            background: linear-gradient(90deg, var(--ink) 0%, #3d3326 100%);
+            color: var(--paper);
+            padding: 18px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.2rem;
+            font-weight: 400;
+        }
+
+        .section-points {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            background: var(--accent);
+            padding: 4px 12px;
+            border-radius: 2px;
+        }
+
+        .section-body {
+            padding: 30px;
+        }
+
+        .section-intro {
+            color: var(--ink-light);
+            font-size: 0.95rem;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px dashed var(--paper-dark);
+        }
+
+        .question-item {
+            margin-bottom: 30px;
+            padding: 25px;
+            background: linear-gradient(180deg, var(--code-bg) 0%, white 100%);
+            border: 1px solid var(--paper-dark);
+            position: relative;
+        }
+
+        .question-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .question-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .question-marker {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            background: var(--ink);
+            color: var(--paper);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .question-text {
+            flex: 1;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .question-text code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--highlight);
+            padding: 2px 8px;
+            font-size: 0.9em;
+            border-radius: 2px;
+        }
+
+        .pts-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--accent);
+            margin-left: 8px;
+            white-space: nowrap;
+        }
+
+        .hint-text {
+            font-size: 0.85rem;
+            color: var(--ink-light);
+            font-style: italic;
+            margin-top: 10px;
+            padding-left: 40px;
+        }
+
+        .hint-text::before {
+            content: '💡 ';
+        }
+
+        /* Code input styling */
+        .code-input-group {
+            display: flex;
+            align-items: stretch;
+            margin-top: 12px;
+        }
+
+        .code-prefix {
+            background: var(--ink);
+            color: var(--highlight);
+            padding: 14px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+        }
+
+        .code-input {
+            flex: 1;
+            padding: 14px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            border: 2px solid var(--paper-dark);
+            border-left: none;
+            background: var(--code-bg);
+            color: var(--ink);
+            transition: all 0.3s ease;
+        }
+
+        .code-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: white;
+        }
+
+        /* Dual input for code + answer */
+        .dual-input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .dual-input-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input-group label {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--ink-light);
+            margin-bottom: 6px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            border: 2px solid var(--paper-dark);
+            background: var(--code-bg);
+            transition: all 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: white;
+        }
+
+        /* Textarea styling */
+        .answer-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 16px;
+            font-family: 'Source Serif 4', serif;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            border: 2px solid var(--paper-dark);
+            background: var(--code-bg);
+            resize: vertical;
+            transition: all 0.3s ease;
+            margin-top: 12px;
+        }
+
+        .answer-textarea.code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .answer-textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: white;
+        }
+
+        /* Inline number inputs */
+        .inline-answer-row {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .inline-answer-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .inline-answer-group label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--ink-light);
+        }
+
+        .inline-answer-group input {
+            width: 80px;
+            padding: 10px 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            border: 2px solid var(--paper-dark);
+            background: var(--code-bg);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .inline-answer-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: white;
+        }
+
+        /* ============ SUBMIT AREA ============ */
+        .submit-area {
+            text-align: center;
+            padding: 50px 0;
+            position: relative;
+        }
+
+        .submit-area::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--paper-dark), transparent);
+        }
+
+        .btn-submit {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-glow) 100%);
+            color: white;
+            border: none;
+            padding: 20px 50px;
+            font-family: 'Playfair Display', serif;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            box-shadow: 0 8px 30px rgba(196, 93, 62, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-submit::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 15px 45px rgba(196, 93, 62, 0.4);
+        }
+
+        .btn-submit:hover::before {
+            left: 100%;
+        }
+
+        .btn-submit:disabled {
+            background: var(--ink-light);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-submit svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ============ RESULTS SCREEN ============ */
+        .results-screen {
+            display: none;
+            animation: fadeIn 0.8s ease-out;
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .results-header {
+            margin-bottom: 50px;
+        }
+
+        .success-badge {
+            display: inline-block;
+            background: var(--success);
+            color: white;
+            padding: 8px 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .results-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.4rem;
+            font-weight: 400;
+            margin-bottom: 10px;
+        }
+
+        .student-id-display {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--ink-light);
+            font-size: 0.9rem;
+        }
+
+        .result-message {
+            font-size: 1.1rem;
+            color: var(--ink);
+            margin: 15px 0;
+            padding: 12px 24px;
+            background: var(--highlight);
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .score-display {
+            margin: 50px 0;
+            position: relative;
+        }
+
+        .score-circle {
+            width: 220px;
+            height: 220px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .score-circle svg {
+            transform: rotate(-90deg);
+        }
+
+        .score-circle .bg {
+            fill: none;
+            stroke: var(--paper-dark);
+            stroke-width: 8;
+        }
+
+        .score-circle .progress {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 628;
+            stroke-dashoffset: 628;
+            transition: stroke-dashoffset 1.5s ease-out;
+        }
+
+        .score-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .score-value .number {
+            font-family: 'Playfair Display', serif;
+            font-size: 4rem;
+            font-weight: 700;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .score-value .total {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--ink-light);
+            margin-top: 5px;
+        }
+
+        .results-details {
+            background: white;
+            border: 1px solid var(--paper-dark);
+            margin-top: 50px;
+            text-align: left;
+            box-shadow: 0 10px 40px var(--shadow);
+        }
+
+        .details-header {
+            background: var(--ink);
+            color: var(--paper);
+            padding: 15px 25px;
+            font-family: 'Playfair Display', serif;
+            font-size: 1.1rem;
+        }
+
+        .details-body {
+            padding: 20px 25px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--paper-dark);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .result-row:last-child {
+            border-bottom: none;
+        }
+
+        .result-status {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .result-status.correct {
+            background: var(--success);
+            color: white;
+        }
+
+        .result-status.incorrect {
+            background: var(--accent);
+            color: white;
+        }
+
+        .result-status.partial {
+            background: var(--highlight);
+            color: var(--ink);
+        }
+
+        .result-question {
+            flex: 1;
+            color: var(--ink-light);
+        }
+
+        .result-answer {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--ink);
+            margin: 0 15px;
+        }
+
+        .result-points {
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .btn-restart {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--ink);
+            color: var(--paper);
+            border: none;
+            padding: 16px 40px;
+            font-family: 'Source Serif 4', serif;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 40px;
+        }
+
+        .btn-restart:hover {
+            background: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        /* ============ CONFETTI ============ */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            overflow: hidden;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            opacity: 0;
+        }
+
+        /* ============ DECORATIVE ELEMENTS ============ */
+        .deco-corner {
+            position: fixed;
+            width: 120px;
+            height: 120px;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        .deco-corner.top-left {
+            top: 20px;
+            left: 20px;
+            border-left: 2px solid var(--ink);
+            border-top: 2px solid var(--ink);
+        }
+
+        .deco-corner.bottom-right {
+            bottom: 20px;
+            right: 20px;
+            border-right: 2px solid var(--ink);
+            border-bottom: 2px solid var(--ink);
+        }
+
+        /* ============ RESPONSIVE ============ */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 15px 60px;
+            }
+
+            .lab-title {
+                font-size: 2.2rem;
+            }
+
+            .points-display {
+                position: static;
+                margin-bottom: 20px;
+            }
+
+            .login-card {
+                padding: 35px 25px;
+            }
+
+            .scenario-card,
+            .section-body {
+                padding: 20px;
+            }
+
+            .question-item {
+                padding: 18px;
+            }
+
+            .section-header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="deco-corner top-left"></div>
+    <div class="deco-corner bottom-right"></div>
+    <div class="confetti-container" id="confettiContainer"></div>
+
+    <div class="container">
+        <!-- ============ HEADER ============ -->
+        <header class="lab-header">
+            <div class="lab-badge">Text Mining Laboratory</div>
+            <div class="lab-title-row">
+                <h1 class="lab-title">Week 3 Assessment</h1>
+                <div class="points-inline">100<span>points</span></div>
+            </div>
+            <p class="lab-subtitle">Vectors, Data Frames & Descriptive Statistics in R</p>
+        </header>
+
+        <!-- ============ LOGIN SCREEN ============ -->
+        <section class="login-screen" id="loginScreen">
+            <div class="login-illustration">
+                <svg viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="30" y="40" width="120" height="100" fill="#f7f3eb" stroke="#2c2416" stroke-width="2"/>
+                    <line x1="45" y1="65" x2="135" y2="65" stroke="#ebe5d9" stroke-width="1"/>
+                    <line x1="45" y1="80" x2="135" y2="80" stroke="#ebe5d9" stroke-width="1"/>
+                    <line x1="45" y1="95" x2="135" y2="95" stroke="#ebe5d9" stroke-width="1"/>
+                    <line x1="45" y1="110" x2="135" y2="110" stroke="#ebe5d9" stroke-width="1"/>
+                    <line x1="45" y1="125" x2="135" y2="125" stroke="#ebe5d9" stroke-width="1"/>
+                    <text x="50" y="63" fill="#c45d3e" font-family="JetBrains Mono" font-size="8">x &lt;- c(1,2,3)</text>
+                    <text x="50" y="78" fill="#5c5142" font-family="JetBrains Mono" font-size="8">mean(x)</text>
+                    <text x="50" y="93" fill="#5c5142" font-family="JetBrains Mono" font-size="8">sd(x)</text>
+                    <rect x="48" y="100" width="60" height="12" fill="#f4d79e" opacity="0.5"/>
+                    <text x="50" y="109" fill="#2c2416" font-family="JetBrains Mono" font-size="8">data.frame()</text>
+                    <circle cx="145" cy="55" r="15" fill="#c45d3e" opacity="0.9"/>
+                    <text x="145" y="59" fill="white" font-family="Playfair Display" font-size="12" text-anchor="middle">R</text>
+                    <path d="M25 45 L30 40 L30 50 Z" fill="#2c2416"/>
+                </svg>
+            </div>
+
+            <div class="login-card">
+                <h2>Begin Your Assessment</h2>
+                <p>Enter your student ID to start the quiz</p>
+
+                <div class="input-field">
+                    <label for="studentId">Student ID</label>
+                    <input type="text" id="studentId" placeholder="e.g. 112345678" maxlength="20" autocomplete="off">
+                </div>
+
+                <button class="btn-primary" onclick="startQuiz()">
+                    Start Quiz
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </button>
+
+                <p class="error-message" id="loginError"></p>
+            </div>
+        </section>
+
+        <!-- ============ QUIZ SCREEN ============ -->
+        <section class="quiz-screen" id="quizScreen">
+            <!-- Scenario Card -->
+            <div class="scenario-card">
+                <p>You collected data from <strong>6 undergraduate students</strong> in the English Department. Each student reported their <strong>daily study hours</strong> (in hours) and their most recent <strong>TOEFL iBT total score</strong>.</p>
+
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Year</th>
+                                <th>Major</th>
+                                <th>Daily Study (hrs)</th>
+                                <th>TOEFL Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>S01</td><td>3</td><td>ENG</td><td>2.5</td><td>85</td></tr>
+                            <tr><td>S02</td><td>4</td><td>ENG</td><td>4.0</td><td>102</td></tr>
+                            <tr><td>S03</td><td>2</td><td>LING</td><td>1.5</td><td>78</td></tr>
+                            <tr><td>S04</td><td>3</td><td>LING</td><td>3.0</td><td>91</td></tr>
+                            <tr><td>S05</td><td>4</td><td>ENG</td><td>5.0</td><td>110</td></tr>
+                            <tr><td>S06</td><td>2</td><td>LING</td><td>2.0</td><td>82</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Q1: Create Three Vectors -->
+            <div class="question-section">
+                <div class="section-header">
+                    <h3>Q1 · Create Three Vectors</h3>
+                    <span class="section-points">20 points</span>
+                </div>
+                <div class="section-body">
+                    <p class="section-intro">Using the data above, create the following three vectors. Write the complete R code in each box.</p>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">a</span>
+                            <span class="question-text">
+                                A numeric vector called <code>year</code> containing the year of all 6 students
+                                <span class="pts-badge">6 pts</span>
+                            </span>
+                        </div>
+                        <div class="code-input-group">
+                            <span class="code-prefix">year &lt;- c(</span>
+                            <input type="text" class="code-input" id="q1a" placeholder="...">
+                        </div>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">b</span>
+                            <span class="question-text">
+                                A numeric vector called <code>study</code> containing the daily study hours
+                                <span class="pts-badge">6 pts</span>
+                            </span>
+                        </div>
+                        <div class="code-input-group">
+                            <span class="code-prefix">study &lt;- c(</span>
+                            <input type="text" class="code-input" id="q1b" placeholder="...">
+                        </div>
+                        <p class="hint-text">Careful with decimal points!</p>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">c</span>
+                            <span class="question-text">
+                                A numeric vector called <code>toefl</code> containing the TOEFL scores
+                                <span class="pts-badge">8 pts</span>
+                            </span>
+                        </div>
+                        <div class="code-input-group">
+                            <span class="code-prefix">toefl &lt;- c(</span>
+                            <input type="text" class="code-input" id="q1c" placeholder="...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Q2: Compute Descriptive Statistics -->
+            <div class="question-section">
+                <div class="section-header">
+                    <h3>Q2 · Compute Descriptive Statistics</h3>
+                    <span class="section-points">30 points</span>
+                </div>
+                <div class="section-body">
+                    <p class="section-intro">Write the R function call AND record the numeric result. Run each in RStudio to verify.</p>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">a</span>
+                            <span class="question-text">
+                                What is the mean (average) of the <code>toefl</code> vector?
+                                <span class="pts-badge">6 pts</span>
+                            </span>
+                        </div>
+                        <div class="dual-input-row">
+                            <div class="input-group">
+                                <label>R Code</label>
+                                <input type="text" id="q2a_code" placeholder="mean(...)">
+                            </div>
+                            <div class="input-group">
+                                <label>Answer</label>
+                                <input type="text" id="q2a_ans" placeholder="numeric result">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">b</span>
+                            <span class="question-text">
+                                What is the standard deviation of the <code>study</code> vector?
+                                <span class="pts-badge">6 pts</span>
+                            </span>
+                        </div>
+                        <div class="dual-input-row">
+                            <div class="input-group">
+                                <label>R Code</label>
+                                <input type="text" id="q2b_code" placeholder="sd(...)">
+                            </div>
+                            <div class="input-group">
+                                <label>Answer</label>
+                                <input type="text" id="q2b_ans" placeholder="numeric result">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">c</span>
+                            <span class="question-text">
+                                What is the minimum value in the <code>toefl</code> vector?
+                                <span class="pts-badge">6 pts</span>
+                            </span>
+                        </div>
+                        <div class="dual-input-row">
+                            <div class="input-group">
+                                <label>R Code</label>
+                                <input type="text" id="q2c_code" placeholder="min(...)">
+                            </div>
+                            <div class="input-group">
+                                <label>Answer</label>
+                                <input type="text" id="q2c_ans" placeholder="numeric result">
+                            </div>
+                        </div>
+                        <p class="hint-text">Use min() function</p>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">d</span>
+                            <span class="question-text">
+                                How many students study more than 2.5 hours per day?
+                                <span class="pts-badge">6 pts</span>
+                            </span>
+                        </div>
+                        <div class="dual-input-row">
+                            <div class="input-group">
+                                <label>R Code</label>
+                                <input type="text" id="q2d_code" placeholder="sum(...)">
+                            </div>
+                            <div class="input-group">
+                                <label>Answer</label>
+                                <input type="text" id="q2d_ans" placeholder="numeric result">
+                            </div>
+                        </div>
+                        <p class="hint-text">Use sum() with a condition</p>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">e</span>
+                            <span class="question-text">
+                                What does <code>toefl / 10</code> produce? Run it and explain in one sentence.
+                                <span class="pts-badge">6 pts</span>
+                            </span>
+                        </div>
+                        <textarea class="answer-textarea" id="q2e" placeholder="Your explanation..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Q3: Build a Data Frame -->
+            <div class="question-section">
+                <div class="section-header">
+                    <h3>Q3 · Build a Data Frame</h3>
+                    <span class="section-points">20 points</span>
+                </div>
+                <div class="section-body">
+                    <p class="section-intro">Combine all the vectors into a data frame called <code>students</code>. Write the complete R code.</p>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">a</span>
+                            <span class="question-text">
+                                Create the data frame with columns: id, year, major, study, toefl
+                                <span class="pts-badge">12 pts</span>
+                            </span>
+                        </div>
+                        <textarea class="answer-textarea code" id="q3a" placeholder="id <- c(...)
+major <- c(...)
+students <- data.frame(
+    ...
+)"></textarea>
+                        <p class="hint-text">You need to create an "id" vector and a "major" vector from the table first</p>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">b</span>
+                            <span class="question-text">
+                                Run <code>str(students)</code> and answer: How many observations and variables?
+                                <span class="pts-badge">4 pts</span>
+                            </span>
+                        </div>
+                        <div class="inline-answer-row">
+                            <div class="inline-answer-group">
+                                <label>Observations:</label>
+                                <input type="text" id="q3b_obs" placeholder="#">
+                            </div>
+                            <div class="inline-answer-group">
+                                <label>Variables:</label>
+                                <input type="text" id="q3b_var" placeholder="#">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">c</span>
+                            <span class="question-text">
+                                Run <code>summary(students)</code> and answer: What is the median TOEFL score?
+                                <span class="pts-badge">4 pts</span>
+                            </span>
+                        </div>
+                        <div class="inline-answer-row">
+                            <div class="inline-answer-group">
+                                <label>Median TOEFL =</label>
+                                <input type="text" id="q3c" placeholder="#">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Q4: Concept Check -->
+            <div class="question-section">
+                <div class="section-header">
+                    <h3>Q4 · Concept Check — Short Answer</h3>
+                    <span class="section-points">30 points</span>
+                </div>
+                <div class="section-body">
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">a</span>
+                            <span class="question-text">
+                                What is the difference between a vector and a data frame?
+                                <span class="pts-badge">10 pts</span>
+                            </span>
+                        </div>
+                        <textarea class="answer-textarea" id="q4a" placeholder="Your answer..."></textarea>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">b</span>
+                            <span class="question-text">
+                                What does the <code>&lt;-</code> operator do in R? How do you read <code>x &lt;- 5</code> out loud?
+                                <span class="pts-badge">10 pts</span>
+                            </span>
+                        </div>
+                        <textarea class="answer-textarea" id="q4b" placeholder="Your answer..."></textarea>
+                    </div>
+
+                    <div class="question-item">
+                        <div class="question-label">
+                            <span class="question-marker">c</span>
+                            <span class="question-text">
+                                What is the difference between <code>mean()</code> and <code>median()</code>? When might they give very different results?
+                                <span class="pts-badge">10 pts</span>
+                            </span>
+                        </div>
+                        <textarea class="answer-textarea" id="q4c" placeholder="Your answer..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Area -->
+            <div class="submit-area">
+                <button class="btn-submit" onclick="submitQuiz()" id="submitBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Submit Assessment
+                </button>
+                <p class="error-message" id="submitError"></p>
+            </div>
+        </section>
+
+        <!-- ============ RESULTS SCREEN ============ -->
+        <section class="results-screen" id="resultsScreen">
+            <div class="results-header">
+                <div class="success-badge" id="resultBadge">Assessment Complete</div>
+                <h2 class="results-title" id="resultTitle">Excellent Work!</h2>
+                <p class="result-message" id="resultMessage"></p>
+                <p class="student-id-display" id="resultStudentId"></p>
+            </div>
+
+            <div class="score-display">
+                <div class="score-circle">
+                    <svg width="220" height="220" viewBox="0 0 220 220">
+                        <circle class="bg" cx="110" cy="110" r="100"/>
+                        <circle class="progress" id="scoreProgress" cx="110" cy="110" r="100"/>
+                    </svg>
+                    <div class="score-value">
+                        <span class="number" id="finalScore">0</span>
+                        <span class="total">/ 100 points</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-details">
+                <div class="details-header">Detailed Results</div>
+                <div class="details-body" id="resultsDetails"></div>
+            </div>
+
+            <button class="btn-restart" onclick="location.reload()">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                Take Quiz Again
+            </button>
+        </section>
+    </div>
+
+    <script>
+        // Supabase configuration
+        const SUPABASE_URL = 'https://symrvnbybcncqbfpynkc.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5bXJ2bmJ5YmNuY3FiZnB5bmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMDY2MTcsImV4cCI6MjA4ODc4MjYxN30.9QDdhTbJAhmJcKVvkQyWjiT4IUNKZ4XV4AQF5h2tvR4';
+
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let currentStudentId = '';
+
+        // ============ 智能评分系统 ============
+
+        // 标准化函数：移除所有空格、统一大小写、处理各种格式变体
+        function normalize(str) {
+            return str
+                .toLowerCase()
+                .replace(/\s+/g, '')           // 移除所有空格
+                .replace(/['"]/g, '"')         // 统一引号
+                .replace(/\.0+(?=,|$|\))/g, '') // 移除 .0 (如 4.0 -> 4)
+                .replace(/,+/g, ',')           // 移除重复逗号
+                .replace(/\)$/g, '')           // 移除结尾括号
+                .trim();
+        }
+
+        // 解析数字向量（非常宽松）
+        function parseNumericVector(input) {
+            // 移除括号、引号，用各种分隔符分割
+            let cleaned = input
+                .replace(/[()[\]'"]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            // 支持逗号、空格、分号作为分隔符
+            let numbers = cleaned.split(/[,;\s]+/)
+                .map(s => parseFloat(s.trim()))
+                .filter(n => !isNaN(n));
+
+            return numbers;
+        }
+
+        // 检查 R 代码是否语义等价（更宽松版本）
+        function checkRCode(userCode, expectedFunc, expectedArg) {
+            const normalized = normalize(userCode);
+            const userLower = userCode.toLowerCase().trim();
+
+            // 基本检查：函数名和参数都存在
+            const hasFunc = normalized.includes(expectedFunc);
+            const hasArg = normalized.includes(expectedArg.toLowerCase());
+
+            // 接受的变体格式:
+            // mean(toefl), mean( toefl ), mean(x=toefl), mean(toefl, na.rm=TRUE)
+            // toefl %>% mean(), toefl |> mean()
+
+            // Pipe 写法检查
+            const pipePattern = new RegExp(`${expectedArg}\\s*(%>%|\\|>)\\s*${expectedFunc}`, 'i');
+            const hasPipe = pipePattern.test(userCode);
+
+            // 命名参数检查: mean(x = toefl) 或 mean(x=toefl)
+            const namedArgPattern = new RegExp(`${expectedFunc}\\s*\\([^)]*=\\s*${expectedArg}`, 'i');
+            const hasNamedArg = namedArgPattern.test(userCode);
+
+            return (hasFunc && hasArg) || hasPipe || hasNamedArg;
+        }
+
+        // 检查条件表达式 (如 sum(study > 2.5))（更宽松版本）
+        function checkConditionCode(userCode, expectedFunc, expectedVar, expectedOp, expectedVal) {
+            const normalized = normalize(userCode);
+            const userLower = userCode.toLowerCase();
+
+            // 检查关键元素是否都存在
+            const hasFunc = normalized.includes(expectedFunc);
+            const hasVar = normalized.includes(expectedVar);
+
+            // 支持 > 和 >= 以及各种写法
+            const hasOp = normalized.includes('>') || normalized.includes('>=') ||
+                          normalized.includes('greater') || userLower.includes('大於') || userLower.includes('大于');
+
+            // 数值可以是 2.5 或 2.50 等
+            const valPattern = new RegExp(String(expectedVal).replace('.', '\\.?'));
+            const hasVal = valPattern.test(normalized);
+
+            // 也接受 length(study[study > 2.5]) 这种写法
+            const altPattern = /length\s*\(\s*study\s*\[\s*study\s*>\s*2\.?5/i;
+            const hasAltSyntax = altPattern.test(userCode);
+
+            return (hasFunc && hasVar && hasOp && hasVal) || hasAltSyntax;
+        }
+
+        // 模糊字符串匹配（处理拼写错误）
+        function fuzzyMatch(str, target, maxDistance = 2) {
+            str = str.toLowerCase();
+            target = target.toLowerCase();
+            if (str.includes(target) || target.includes(str)) return true;
+
+            // 简单的编辑距离检查（只检查相差1-2个字符的情况）
+            if (Math.abs(str.length - target.length) <= maxDistance) {
+                let matches = 0;
+                const shorter = str.length < target.length ? str : target;
+                const longer = str.length < target.length ? target : str;
+                for (let i = 0; i < shorter.length; i++) {
+                    if (longer.includes(shorter[i])) matches++;
+                }
+                return matches >= shorter.length - maxDistance;
+            }
+            return false;
+        }
+
+        // 正确答案配置 (总分 100 分)
+        const answers = {
+            // Q1: 向量创建 - 只检查数值是否正确 (20分)
+            q1a: {
+                points: 6,
+                type: 'numeric_vector',
+                expected: [3, 4, 2, 3, 4, 2],
+                tolerance: 0.001
+            },
+            q1b: {
+                points: 6,
+                type: 'numeric_vector',
+                expected: [2.5, 4, 1.5, 3, 5, 2],  // 4.0 = 4, 5.0 = 5 等
+                tolerance: 0.01
+            },
+            q1c: {
+                points: 8,
+                type: 'numeric_vector',
+                expected: [85, 102, 78, 91, 110, 82],
+                tolerance: 0.001
+            },
+
+            // Q2: 统计函数 (30分)
+            q2a_code: {
+                points: 3,
+                type: 'r_function',
+                func: 'mean',
+                arg: 'toefl'
+            },
+            q2a_ans: {
+                points: 3,
+                type: 'numeric',
+                expected: 91.33333,
+                tolerance: 0.5  // 允许四舍五入差异
+            },
+            q2b_code: {
+                points: 3,
+                type: 'r_function',
+                func: 'sd',
+                arg: 'study'
+            },
+            q2b_ans: {
+                points: 3,
+                type: 'numeric',
+                expected: 1.264911,
+                tolerance: 0.1
+            },
+            q2c_code: {
+                points: 3,
+                type: 'r_function',
+                func: 'min',
+                arg: 'toefl'
+            },
+            q2c_ans: {
+                points: 3,
+                type: 'numeric',
+                expected: 78,
+                tolerance: 0.001
+            },
+            q2d_code: {
+                points: 3,
+                type: 'r_condition',
+                func: 'sum',
+                var: 'study',
+                op: '>',
+                val: 2.5
+            },
+            q2d_ans: {
+                points: 3,
+                type: 'numeric',
+                expected: 3,
+                tolerance: 0.001
+            },
+            q2e: {
+                points: 6,
+                type: 'text_concept',
+                concepts: [
+                    // 除法概念
+                    ['divide', 'divides', 'divided', 'division', 'split', '除', '÷', '/10', '/ 10'],
+                    // 每个元素概念
+                    ['each', 'every', 'all', 'element', 'number', 'score', '每', '各', '所有', '個', '个', 'individual'],
+                    // 向量/结果概念
+                    ['vector', '向量', 'result', 'results', '結果', '结果', 'output', 'return', 'new', 'scaled', 'smaller']
+                ],
+                minConcepts: 2
+            },
+
+            // Q3: Data Frame (20分)
+            q3a: {
+                points: 12,
+                type: 'dataframe_code',
+                requiredElements: ['data.frame', 'id', 'year', 'major', 'study', 'toefl'],
+                minRequired: 4
+            },
+            q3b_obs: {
+                points: 2,
+                type: 'numeric',
+                expected: 6,
+                tolerance: 0
+            },
+            q3b_var: {
+                points: 2,
+                type: 'numeric',
+                expected: 5,
+                tolerance: 0
+            },
+            q3c: {
+                points: 4,
+                type: 'numeric',
+                expected: 88,
+                tolerance: 0.5
+            },
+
+            // Q4: 概念题 - 关键词检测 (30分) - 扩充关键词
+            q4a: {
+                points: 10,
+                type: 'text_concept',
+                concepts: [
+                    // 一维概念
+                    ['one', 'single', '1d', '1-d', 'one-dimension', 'one dimension', 'linear',
+                     '一維', '一维', '單一', '单一', 'same type', 'homogeneous', '同類', '同类'],
+                    // 二维/表格概念
+                    ['two', 'multi', '2d', '2-d', 'two-dimension', 'two dimension', 'table', 'spreadsheet', 'matrix',
+                     '二維', '二维', '表', '表格', 'different type', 'heterogeneous', '不同類', '不同类'],
+                    // 行列概念
+                    ['column', 'columns', 'row', 'rows', 'variable', 'variables', 'field', 'fields',
+                     '行', '列', '欄', '栏', '變數', '变量', 'observation', 'observations', '觀察', '观察']
+                ],
+                minConcepts: 2
+            },
+            q4b: {
+                points: 10,
+                type: 'text_concept',
+                concepts: [
+                    // 赋值概念（扩充拼写错误）
+                    ['assign', 'assigns', 'assignment', 'asign', 'asignment', 'store', 'stores', 'storing',
+                     'save', 'saves', 'put', 'puts', 'set', 'sets', 'define', 'defines', 'create', 'creates',
+                     '賦值', '赋值', '指派', '儲存', '存储', '給', '给', '設定', '设定'],
+                    // 值/变量概念
+                    ['value', 'values', 'variable', 'variables', 'name', 'object', 'data',
+                     '值', '變數', '变量', '物件', '对象', '數據', '数据', 'number', 'content'],
+                    // 读法概念
+                    ['gets', 'get', 'receive', 'receives', 'arrow', 'left arrow', 'point', 'points',
+                     '得到', '接收', '箭頭', '箭头', 'read as', 'pronounced', 'called']
+                ],
+                minConcepts: 1  // 这题只要说出赋值概念就行
+            },
+            q4c: {
+                points: 10,
+                type: 'text_concept',
+                concepts: [
+                    // 平均数概念
+                    ['average', 'averages', 'mean', 'sum', 'total', 'add', 'adding', 'arithmetic',
+                     '平均', '加總', '加总', '總和', '总和', '算術', '算术', 'all values'],
+                    // 中位数概念
+                    ['middle', 'center', 'central', 'median', 'midpoint', 'half', '50%', 'fifty',
+                     '中間', '中间', '中位', '中數', '中数', '中點', '中点', 'sorted', 'ordering'],
+                    // 差异/极端值概念
+                    ['outlier', 'outliers', 'extreme', 'extremes', 'skew', 'skewed', 'different', 'sensitive',
+                     'affected', 'influenced', 'robust', 'resistant', 'pull', 'pulled', 'distort',
+                     '極端', '极端', '異常', '异常', '偏', '離群', '离群', '影響', '影响', '敏感']
+                ],
+                minConcepts: 2
+            }
+        };
+
+        // 主要评分函数
+        function checkAnswer(questionId, userAnswer) {
+            const answer = answers[questionId];
+            if (!answer) return { correct: false, points: 0 };
+            if (!userAnswer || userAnswer.trim() === '') return { correct: false, points: 0 };
+
+            const trimmedAnswer = userAnswer.trim();
+
+            switch (answer.type) {
+                case 'numeric_vector': {
+                    const userVec = parseNumericVector(trimmedAnswer);
+                    const expected = answer.expected;
+
+                    // 检查数量是否正确
+                    if (userVec.length !== expected.length) {
+                        // 部分分数：每个正确的数字给部分分
+                        let correctCount = 0;
+                        for (let i = 0; i < Math.min(userVec.length, expected.length); i++) {
+                            if (Math.abs(userVec[i] - expected[i]) <= answer.tolerance) {
+                                correctCount++;
+                            }
+                        }
+                        const partial = (correctCount / expected.length) * answer.points;
+                        return { correct: false, points: Math.round(partial * 10) / 10 };
+                    }
+
+                    // 检查每个值
+                    const allCorrect = expected.every((val, idx) =>
+                        Math.abs(val - userVec[idx]) <= answer.tolerance
+                    );
+
+                    if (allCorrect) {
+                        return { correct: true, points: answer.points };
+                    }
+
+                    // 计算部分分数
+                    let correctCount = 0;
+                    expected.forEach((val, idx) => {
+                        if (Math.abs(val - userVec[idx]) <= answer.tolerance) {
+                            correctCount++;
+                        }
+                    });
+                    const partial = (correctCount / expected.length) * answer.points;
+                    return { correct: false, points: Math.round(partial * 10) / 10 };
+                }
+
+                case 'numeric': {
+                    // 提取数字（支持各种格式）
+                    const numMatch = trimmedAnswer.match(/-?\d+\.?\d*/);
+                    if (!numMatch) return { correct: false, points: 0 };
+
+                    const userNum = parseFloat(numMatch[0]);
+                    const isCorrect = Math.abs(userNum - answer.expected) <= answer.tolerance;
+                    return { correct: isCorrect, points: isCorrect ? answer.points : 0 };
+                }
+
+                case 'r_function': {
+                    const isCorrect = checkRCode(trimmedAnswer, answer.func, answer.arg);
+                    return { correct: isCorrect, points: isCorrect ? answer.points : 0 };
+                }
+
+                case 'r_condition': {
+                    const isCorrect = checkConditionCode(
+                        trimmedAnswer,
+                        answer.func,
+                        answer.var,
+                        answer.op,
+                        answer.val
+                    );
+                    return { correct: isCorrect, points: isCorrect ? answer.points : 0 };
+                }
+
+                case 'text_concept': {
+                    const lowerAnswer = trimmedAnswer.toLowerCase();
+                    let matchedConcepts = 0;
+
+                    // 检查每个概念组（只要匹配组内任一关键词就算该概念正确）
+                    answer.concepts.forEach(conceptGroup => {
+                        const hasMatch = conceptGroup.some(keyword =>
+                            lowerAnswer.includes(keyword.toLowerCase())
+                        );
+                        if (hasMatch) matchedConcepts++;
+                    });
+
+                    const isCorrect = matchedConcepts >= answer.minConcepts;
+                    const ratio = matchedConcepts / answer.concepts.length;
+                    const earnedPoints = Math.round(ratio * answer.points * 10) / 10;
+
+                    return {
+                        correct: isCorrect,
+                        points: Math.max(isCorrect ? answer.points : earnedPoints, 0)
+                    };
+                }
+
+                case 'dataframe_code': {
+                    const lowerAnswer = trimmedAnswer.toLowerCase();
+                    let matchCount = 0;
+
+                    answer.requiredElements.forEach(element => {
+                        if (lowerAnswer.includes(element.toLowerCase())) {
+                            matchCount++;
+                        }
+                    });
+
+                    const isCorrect = matchCount >= answer.minRequired;
+                    const ratio = matchCount / answer.requiredElements.length;
+                    const earnedPoints = Math.round(ratio * answer.points * 10) / 10;
+
+                    return {
+                        correct: isCorrect,
+                        points: isCorrect ? answer.points : earnedPoints
+                    };
+                }
+
+                default:
+                    return { correct: false, points: 0 };
+            }
+        }
+
+        function startQuiz() {
+            const studentId = document.getElementById('studentId').value.trim();
+            if (!studentId) {
+                const errorEl = document.getElementById('loginError');
+                errorEl.textContent = 'Please enter your student ID';
+                errorEl.style.display = 'block';
+                document.getElementById('studentId').focus();
+                return;
+            }
+
+            currentStudentId = studentId;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('quizScreen').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function createConfetti() {
+            const container = document.getElementById('confettiContainer');
+            const colors = ['#c45d3e', '#f4d79e', '#4a7c59', '#3282b8', '#2c2416'];
+
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.width = (Math.random() * 8 + 5) + 'px';
+                confetti.style.height = (Math.random() * 8 + 5) + 'px';
+                confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+                const animation = confetti.animate([
+                    {
+                        top: '-10%',
+                        opacity: 1,
+                        transform: `rotate(0deg) translateX(0)`
+                    },
+                    {
+                        top: '100%',
+                        opacity: 0,
+                        transform: `rotate(${Math.random() * 720 - 360}deg) translateX(${Math.random() * 200 - 100}px)`
+                    }
+                ], {
+                    duration: Math.random() * 2000 + 2000,
+                    delay: Math.random() * 500,
+                    easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                });
+
+                container.appendChild(confetti);
+
+                animation.onfinish = () => confetti.remove();
+            }
+        }
+
+        async function submitQuiz() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading-spinner"></span> Submitting...';
+
+            // Collect all answers
+            const userAnswers = {};
+            const results = {};
+            let totalScore = 0;
+
+            Object.keys(answers).forEach(qId => {
+                const element = document.getElementById(qId);
+                if (element) {
+                    const userAnswer = element.value;
+                    userAnswers[qId] = userAnswer;
+                    const result = checkAnswer(qId, userAnswer);
+                    results[qId] = result;
+                    totalScore += result.points;
+                }
+            });
+
+            totalScore = Math.round(totalScore * 10) / 10;
+
+            // Save to Supabase
+            try {
+                const { data, error } = await supabaseClient
+                    .from('quiz_results')
+                    .insert([{
+                        student_id: currentStudentId,
+                        answers: userAnswers,
+                        results: results,
+                        score: totalScore,
+                        quiz_name: 'week3_vectors_dataframes_v2',
+                        submitted_at: new Date().toISOString()
+                    }]);
+
+                if (error) {
+                    console.error('Supabase error:', error);
+                }
+            } catch (err) {
+                console.error('Error saving to database:', err);
+            }
+
+            showResults(totalScore, results, userAnswers);
+        }
+
+        function showResults(score, results, userAnswers) {
+            document.getElementById('quizScreen').style.display = 'none';
+            document.getElementById('resultsScreen').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            document.getElementById('resultStudentId').textContent = `Student ID: ${currentStudentId}`;
+            document.getElementById('finalScore').textContent = score;
+
+            // 根据成绩显示不同评语
+            const resultTitle = document.getElementById('resultTitle');
+            const resultBadge = document.getElementById('resultBadge');
+            const resultMessage = document.getElementById('resultMessage');
+
+            let title, badge, message, badgeColor;
+
+            if (score >= 90) {
+                title = '🌟 Outstanding!';
+                badge = 'Excellent Performance';
+                message = '太棒了！你完全掌握了 R 的基础知识！';
+                badgeColor = '#4a7c59'; // success green
+            } else if (score >= 80) {
+                title = '👏 Great Job!';
+                badge = 'Well Done';
+                message = '做得很好！你对 R 有很好的理解。';
+                badgeColor = '#3282b8'; // blue
+            } else if (score >= 70) {
+                title = '👍 Good Work!';
+                badge = 'Keep Going';
+                message = '不错的表现！继续练习可以更进步。';
+                badgeColor = '#6a8caf'; // light blue
+            } else if (score >= 60) {
+                title = '📚 Keep Learning!';
+                badge = 'Room for Improvement';
+                message = '及格了！建议复习一下向量和数据框的概念。';
+                badgeColor = '#d4a03c'; // gold
+            } else {
+                title = '💪 Don\'t Give Up!';
+                badge = 'Needs Review';
+                message = '这次成绩不理想，但别灰心！建议重新阅读教材并多练习。';
+                badgeColor = '#c45d3e'; // accent red
+            }
+
+            resultTitle.textContent = title;
+            resultBadge.textContent = badge;
+            resultBadge.style.backgroundColor = badgeColor;
+            resultMessage.textContent = message;
+
+            // Animate score circle
+            const progress = document.getElementById('scoreProgress');
+            const circumference = 2 * Math.PI * 100;
+            const offset = circumference - (score / 100) * circumference;
+            setTimeout(() => {
+                progress.style.strokeDashoffset = offset;
+            }, 100);
+
+            // Build results details
+            const questionLabels = {
+                q1a: 'Q1(a) year vector',
+                q1b: 'Q1(b) study vector',
+                q1c: 'Q1(c) toefl vector',
+                q2a_code: 'Q2(a) mean code',
+                q2a_ans: 'Q2(a) mean answer',
+                q2b_code: 'Q2(b) sd code',
+                q2b_ans: 'Q2(b) sd answer',
+                q2c_code: 'Q2(c) min code',
+                q2c_ans: 'Q2(c) min answer',
+                q2d_code: 'Q2(d) sum code',
+                q2d_ans: 'Q2(d) sum answer',
+                q2e: 'Q2(e) explanation',
+                q3a: 'Q3(a) data frame',
+                q3b_obs: 'Q3(b) observations',
+                q3b_var: 'Q3(b) variables',
+                q3c: 'Q3(c) median TOEFL',
+                q4a: 'Q4(a) vector vs df',
+                q4b: 'Q4(b) <- operator',
+                q4c: 'Q4(c) mean vs median'
+            };
+
+            const detailsHtml = Object.entries(results).map(([qId, result]) => {
+                const answer = answers[qId];
+                const userAns = userAnswers[qId] || '(no answer)';
+                const displayAns = userAns.length > 35 ? userAns.substring(0, 35) + '...' : userAns;
+                const statusClass = result.correct ? 'correct' : (result.points > 0 ? 'partial' : 'incorrect');
+                const statusIcon = result.correct ? '✓' : (result.points > 0 ? '~' : '✗');
+
+                return `
+                    <div class="result-row">
+                        <div class="result-status ${statusClass}">${statusIcon}</div>
+                        <span class="result-question">${questionLabels[qId] || qId}</span>
+                        <span class="result-answer">${displayAns}</span>
+                        <span class="result-points">${result.points}/${answer.points}</span>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('resultsDetails').innerHTML = detailsHtml;
+
+            // Trigger confetti for good scores
+            if (score >= 35) {
+                createConfetti();
+            }
+        }
+
+        // Enter key to start quiz
+        document.getElementById('studentId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                startQuiz();
+            }
+        });
+
+        // Focus input on load
+        window.addEventListener('load', () => {
+            document.getElementById('studentId').focus();
+        });
+    </script>
+</body>
+</html>
